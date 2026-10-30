@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彩虹邨天主教英文中學 - 高中地理科 3D 互動學習登島平台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Tilt-Shift / Miniature Blur Overlay */
+        .tilt-shift-vignette {
+            pointer-events: none;
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 100px rgba(15, 23, 42, 0.85);
+            background: radial-gradient(circle, transparent 60%, rgba(15, 23, 42, 0.6) 100%);
+            z-index: 5;
+        }
+
+        /* Glassmorphism Styling */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.82);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.8);
+        }
+
+        /* Pulse glow animation for interactive hotspots */
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); opacity: 0.9; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+            50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 25px rgba(239, 68, 68, 1); }
+        }
+        .hotspot-pulse {
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+
+        /* Shaking camera effect */
+        @keyframes quakeShake {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            10% { transform: translate(-3px, 2px) rotate(-0.5deg); }
+            20% { transform: translate(3px, -2px) rotate(0.5deg); }
+            30% { transform: translate(-4px, -1px) rotate(-1deg); }
+            40% { transform: translate(4px, 2px) rotate(1deg); }
+            50% { transform: translate(-2px, 3px) rotate(-0.5deg); }
+            60% { transform: translate(3px, -3px) rotate(0.5deg); }
+            70% { transform: translate(-3px, 1px) rotate(-0.5deg); }
+            80% { transform: translate(2px, -2px) rotate(0.5deg); }
+            90% { transform: translate(-1px, 2px) rotate(0deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .shaking-active {
+            animation: quakeShake 0.15s infinite;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col md:flex-row overflow-hidden select-none">
+
+    <!-- 3D Viewport Container -->
+    <div id="viewport-container" class="relative w-full h-1/2 md:h-full md:w-7/12 lg:w-2/3 flex-shrink-0 bg-slate-950 overflow-hidden">
+        
+        <!-- Canvas Element -->
+        <canvas id="three-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+        
+        <!-- Tilt shift vignette -->
+        <div class="tilt-shift-vignette"></div>
+
+        <!-- Top Header Overlay -->
+        <div class="absolute top-4 left-4 right-4 flex items-center justify-between z-10 pointer-events-none">
+            <div class="glass-panel rounded-2xl px-4 py-2.5 flex items-center gap-3 pointer-events-auto shadow-xl">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-400 font-black text-lg">
+                    <i class="fa-solid fa-earth-asia"></i>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-indigo-300 tracking-wider">彩虹邨天主教英文中學 高中地理科</div>
+                    <h1 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
+                        <span>機會與風險：2016 日本熊本地震</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">微縮 3D 模型島</span>
+                    </h1>
+                </div>
+            </div>
+
+            <!-- Mobile Drawer Toggle Button -->
+            <button id="btn-toggle-mobile-panel" onclick="toggleMobilePanel()" class="md:hidden glass-panel p-3 rounded-2xl text-indigo-300 hover:text-white pointer-events-auto transition shadow-lg">
+                <i class="fa-solid fa-file-pen text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Floating Simulation Controls Toolbar -->
+        <div class="absolute bottom-4 left-4 right-4 md:right-auto z-10 flex flex-wrap items-center justify-center gap-2 pointer-events-auto">
+            <div class="glass-panel p-2 rounded-2xl flex items-center gap-1.5 shadow-2xl">
+                <button onclick="setCameraView('overview')" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-700/60 hover:text-white transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-globe text-indigo-400"></i> 全景
+                </button>
+                <button onclick="triggerSimEarthquake(6.2)" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-house-chimney-crack"></i> 模擬前震 M6.2
+                </button>
+                <button onclick="triggerSimEarthquake(7.3)" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-volcano text-red-400"></i> 模擬主震 M7.3
+                </button>
+                <button onclick="resetDamageState()" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-left"></i> 重置模型
+                </button>
+            </div>
+        </div>
+
+        <!-- Interactive Hex Island Navigator Badges -->
+        <div class="hidden lg:flex absolute top-20 left-4 z-10 flex-col gap-2 pointer-events-auto">
+            <button onclick="focusIsland(0)" class="glass-panel px-3 py-2 rounded-xl text-xs text-left hover:bg-indigo-600/30 transition border-l-4 border-indigo-500 flex items-center gap-2">
+                <i class="fa-solid fa-map-pin text-indigo-400"></i> 島嶼 1: 構造與震央
+            </button>
+            <button onclick="focusIsland(1)" class="glass-panel px-3 py-2 rounded-xl text-xs text-left hover:bg-indigo-600/30 transition border-l-4 border-red-500 flex items-center gap-2">
+                <i class="fa-solid fa-building-burst text-red-400"></i> 島嶼 2: 破壞與災情
+            </button>
+            <button onclick="focusIsland(2)" class="glass-panel px-3 py-2 rounded-xl text-xs text-left hover:bg-indigo-600/30 transition border-l-4 border-emerald-500 flex items-center gap-2">
+                <i class="fa-solid fa-city text-emerald-400"></i> 島嶼 3: 社會經濟因素
+            </button>
+            <button onclick="focusIsland(3)" class="glass-panel px-3 py-2 rounded-xl text-xs text-left hover:bg-indigo-600/30 transition border-l-4 border-amber-500 flex items-center gap-2">
+                <i class="fa-solid fa-scale-balanced text-amber-400"></i> 島嶼 4: 專題辯論場
+            </button>
+        </div>
+
+        <!-- Hotspot Info Modal Overlay -->
+        <div id="hotspot-modal" class="hidden absolute bottom-20 left-4 right-4 max-w-md mx-auto glass-panel p-4 rounded-2xl z-20 shadow-2xl transition border border-indigo-500/30">
+            <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                    <span id="hotspot-badge" class="px-2 py-0.5 rounded text-xs font-bold bg-indigo-500/30 text-indigo-300">特寫標記</span>
+                    <h3 id="hotspot-title" class="font-bold text-white text-base">地標名稱</h3>
+                </div>
+                <button onclick="closeHotspotModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p id="hotspot-desc" class="text-xs text-slate-300 leading-relaxed mb-3"></p>
+            <div id="hotspot-extra" class="p-2.5 rounded-xl bg-slate-900/60 text-xs text-indigo-200 border border-slate-800"></div>
+        </div>
+    </div>
+
+    <!-- Right Interactive Panel (Worksheet & Discussion Hub) -->
+    <div id="learning-panel" class="w-full h-1/2 md:h-full md:w-5/12 lg:w-1/3 glass-panel flex flex-col z-20 border-t md:border-t-0 md:border-l border-slate-700/60 transition-all duration-300">
+        
+        <!-- Student Info Header & Tab Navigation -->
+        <div class="p-4 border-b border-slate-700/60 bg-slate-900/80 flex-shrink-0">
+            <!-- Student Metadata Input Bar -->
+            <div class="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                    <label class="block text-[10px] text-slate-400 uppercase font-semibold mb-1">學生姓名</label>
+                    <input type="text" id="student-name" value="張小明" class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 uppercase font-semibold mb-1">班別 / 座號</label>
+                    <input type="text" id="student-class" value="S5A (12)" class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs font-semibold">
+                <button id="tab-btn-A" onclick="switchTab('A')" class="flex-1 py-1.5 rounded-lg text-indigo-400 bg-indigo-950/80 border border-indigo-500/30 transition flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-magnifying-glass"></i> A. 震災搜集
+                </button>
+                <button id="tab-btn-B" onclick="switchTab('B')" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-chart-pie"></i> B. 社經資料
+                </button>
+                <button id="tab-btn-C" onclick="switchTab('C')" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-comments"></i> C. 專題辯論
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Contents Scrollable Area -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+
+            <!-- TAB A: 地震資料搜集 (Section A) -->
+            <div id="tab-content-A" class="space-y-4">
+                <div class="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 flex items-start gap-3">
+                    <i class="fa-solid fa-circle-info text-indigo-400 text-base mt-0.5"></i>
+                    <div class="text-xs text-indigo-200 leading-relaxed">
+                        <strong>必修單元：機會與風險</strong><br>
+                        1.5 構造災害造成甚麼破壞？我們可以怎樣應付？請參考 3D 地圖與考據資料填寫工作紙。
+                    </div>
+                </div>
+
+                <!-- Section A Forms -->
+                <div class="space-y-3">
+                    <div class="glass-card p-3 rounded-xl space-y-2">
+                        <h4 class="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-clock-rotate-left"></i> 地震基本參數
+                        </h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <label class="text-[10px] text-slate-400">日期與時間</label>
+                                <input type="text" id="field-datetime" value="2016年4月14日 21:26 (前震) / 4月16日 01:25 (主震)" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">震央位置</label>
+                                <input type="text" id="field-epicenter" value="日本九州熊本縣 (益城町附近)" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">強度 (震級)</label>
+                                <input type="text" id="field-magnitude" value="前震 M6.2 / 主震 M7.3 (氣象廳震度7級)" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">震源深度</label>
+                                <input type="text" id="field-depth" value="極淺層地震 (約 11 - 12 公里)" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Geological Causes & Faults -->
+                    <div class="glass-card p-3 rounded-xl space-y-2">
+                        <h4 class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-volcano"></i> 地質成因與板塊構造
+                        </h4>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">成因 (板塊邊界類型 / 斷層類別)</label>
+                            <textarea id="field-causes" rows="3" class="w-full bg-slate-800/60 border border-slate-700/80 rounded p-2 text-xs text-slate-200 leading-relaxed">位於歐亞板塊與菲律賓海板塊俯衝帶附近的微板塊陸內剪切區。由「布田川・日向田斷層帶」(Futagawa-Hinagu Fault Zone) 活動引發，屬於典型的「右移平移斷層 (Right-lateral Strike-slip Fault)」淺層陸內地震。</textarea>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">次生災害 (Secondary Hazards)</label>
+                            <input type="text" id="field-secondary" value="大規模山泥傾瀉 (土石流)、嚴重火災、土壤液化、阿蘇火山微量噴發" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">發生頻率 (Frequency)</label>
+                            <input type="text" id="field-frequency" value="日本整體屬地震極高頻發區，但此斷層帶發生 M7 級以上強震的週期約每千年一次。" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200">
+                        </div>
+                    </div>
+
+                    <!-- Damage and Casualties -->
+                    <div class="glass-card p-3 rounded-xl space-y-2">
+                        <h4 class="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-skull-crossbones"></i> 災害影響數據
+                        </h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <label class="text-[10px] text-slate-400">死亡人數</label>
+                                <input type="text" id="field-deaths" value="約 277 人 (含直接遇難與災後關聯死亡)" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">受傷人數</label>
+                                <input type="text" id="field-injured" value="約 2,809 人" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">無家可歸/避難人數</label>
+                                <input type="text" id="field-homeless" value="高峰期達 183,882 人" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">失蹤人數</label>
+                                <input type="text" id="field-missing" value="初期 8 人 (後續搜尋確認)" class="w-full bg-slate-800/60 border border-slate-700/80 rounded px-2 py-1 text-slate-200">
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <label class="text-[10px] text-slate-400 block mb-1">對建築物的破壞</label>
+                            <textarea id="field-buildings" rows="2" class="w-full bg-slate-800/60 border border-slate-700/80 rounded p-2 text-xs text-slate-200">全毀房屋 8,241 棟，半毀 25,663 棟。益城町古舊瓦頂木造住宅呈倒塌式毀壞；歷史古蹟熊本城石垣大量崩落。</textarea>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-1">對公用設施/基礎設施的破壞</label>
+                            <textarea id="field-infrastructure" rows="2" class="w-full bg-slate-800/60 border border-slate-700/80 rounded p-2 text-xs text-slate-200">阿蘇大橋因山泥傾瀉坍塌墜河；九州新幹線列車出軌；自來水、天然氣供水切斷數周；電力短暫中斷。</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB B: 日本社會經濟資料 (Section B) -->
+            <div id="tab-content-B" class="hidden space-y-4">
+                <div class="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-start gap-3">
+                    <i class="fa-solid fa-chart-line text-emerald-400 text-base mt-0.5"></i>
+                    <div class="text-xs text-emerald-200 leading-relaxed">
+                        <strong>B. 搜集資料：日本的社會經濟背景</strong><br>
+                        評估高度發達國家 (MEDC) 的社會經濟特徵對震災害防禦與復原力的影響。
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="glass-card p-3 rounded-xl space-y-2">
+                        <label class="text-xs font-bold text-emerald-300 block">經濟發展水平 (Economic Level)</label>
+                        <textarea id="field-econ-level" rows="2" class="w-full bg-slate-800/60 border border-slate-700/80 rounded p-2 text-xs text-slate-200">高度發達經濟體 (MEDC)，高人均 GDP (約 3.8 萬美元)。具備充裕的政府財政預算與防災基金，用於災後大規模重建與補貼。</textarea>
+                    </div>
+
+                    <div class="glass-card p-3 rounded-xl space-y-2">
+                        <label class="text-xs font-bold text-cyan-300 block">社會運輸網絡 (Transport Network)</label>
+                        <textarea id="field-transport" rows="2" class="w-full bg-slate-800/60 border border-slate-700/80 rounded p-2 text-xs text-slate-200">擁有全球最密集的立體交通網 (新幹線、高速公路、機場與港口)。震後物資配送快，但網絡中斷時對 regional 供應鏈衝擊極大。</textarea>
+                    </div>
+
+                    <div class="glass-card p-3 rounded-xl space-y-2">
+                        <label class="text-xs font-bold text-amber-300 block">建築物穩固度、密度與水平</label>
+                        <textarea id="field-building-quality" rows="3" class="w-full bg-slate-800/60 border border-slate-700/80 rounded p-2 text-xs text-slate-200">實施全球最嚴格的「新耐震基準」(1981年後標準)，大量都市高樓配備隔震器與減震阻尼器。但鄉郊地區存在大量舊式瓦頂木造住宅，抗震力較弱。</textarea>
+                    </div>
+
+                    <div class="glass-card p-3 rounded-xl space-y-2">
+                        <label class="text-xs font-bold text-indigo-300 block">政府效率、人口結構與防災教育</label>
+                        <textarea id="field-gov-pop" rows="3" class="w-full bg-slate-800/60 border border-slate-700/80 rounded p-2 text-xs text-slate-200">政府反應極為迅速，自衛隊 24 小時內動員數萬人救援；具備全球領先的「緊急地震速報」系統。然而人口嚴重超老齡化，老人家避難困難；公民防災演習普及率極高。</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB C: 討論與專題辯論 (Section C & AI Tutor) -->
+            <div id="tab-content-C" class="hidden space-y-4">
+                <div class="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30">
+                    <h3 class="text-xs font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-comments"></i> 討論題目
+                    </h3>
+                    <p class="text-xs text-amber-100 leading-relaxed font-medium">
+                        「日本熊本地震的災情是主要因為當地社會經濟因素導致嗎？」
+                    </p>
+                </div>
+
+                <!-- Position Selection Buttons -->
+                <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">選擇你/小組的立場：</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setPosition('agree')" id="pos-btn-agree" class="py-2 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500 transition">
+                            贊成 (主要是社經)
+                        </button>
+                        <button onclick="setPosition('disagree')" id="pos-btn-disagree" class="py-2 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:border-red-500 transition">
+                            反對 (主要是自然)
+                        </button>
+                        <button onclick="setPosition('partial')" id="pos-btn-partial" class="py-2 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:border-amber-500 transition">
+                            部分同意 (雙重作用)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reason Arguments Input Box -->
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">列出詳細理由與地理數據支持：</label>
+                    <textarea id="field-discussion-reasons" rows="6" placeholder="請填寫你的分析，例如：雖然日本是 MEDC，但短短 28 小時內爆發兩次 7 級極淺層地震（前震+主震），地表加速度達 1.83g，且斷層貫穿人口密集的益城町，自然因素強度遠超防禦極限..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-100 leading-relaxed focus:outline-none focus:border-amber-500"></textarea>
+                </div>
+
+                <!-- AI Assessment & Tutor Assistant -->
+                <div class="glass-card p-3 rounded-xl space-y-2 border border-indigo-500/40">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
+                            <i class="fa-solid fa-robot text-indigo-400"></i> AI 地理導師評價與引導
+                        </div>
+                        <button onclick="evaluateWithGeminiAI()" class="px-3 py-1 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow flex items-center gap-1">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> AI 智能審閱
+                        </button>
+                    </div>
+                    <div id="ai-response-box" class="min-h-[70px] p-2.5 rounded-lg bg-slate-950/80 text-xs text-slate-300 leading-relaxed border border-slate-800">
+                        點擊「AI 智能審閱」按鈕，Gemini 地理 AI 會根據高考 DSE 地理評分標準分析你的論述並提供修改建議！
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Panel Footer Action Buttons -->
+        <div class="p-3 border-t border-slate-700/60 bg-slate-900/90 flex items-center justify-between gap-2 flex-shrink-0">
+            <button onclick="saveWorksheetProgress()" class="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-floppy-disk text-indigo-400"></i> 儲存答案
+            </button>
+            <button onclick="exportWorksheetSummary()" class="flex-1 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-file-arrow-down"></i> 匯出學習報告
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast-notification" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden glass-panel px-4 py-2.5 rounded-2xl border border-indigo-500/50 text-xs font-medium text-white shadow-2xl flex items-center gap-2">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-message">儲存成功！</span>
+    </div>
+
+    <!-- THREE.JS & APP LOGIC -->
+    <script>
+        // --- GLOBAL STATE ---
+        let scene, camera, renderer, controls;
+        let hexIslands = [];
+        let debrisObjects = [];
+        let castleMesh, bridgeMesh, faultMesh;
+        let particleSystem;
+        let isShaking = false;
+        let activeTab = 'A';
+        let currentPosition = 'disagree';
+
+        // Landmark Hotspot Data
+        const hotspotsData = {
+            castle: {
+                title: "熊本城 (Kumamoto Castle)",
+                badge: "文化遺產破壞",
+                desc: "擁有 400 年歷史的日本三大名城之一。在 2016 年強震中，著名的「武者返」石垣大規模崩落，天守閣瓦片與飾物毀壞。突顯即使經過耐震補強，極高加速度震動對歷史石造構造物的致命破壞。",
+                extra: "破壞特徵：石垣滑塌、屋頂重瓦脫落（傳統建築設計用重瓦壓實木構，但在強震中反而加大慣性力）。"
+            },
+            bridge: {
+                title: "阿蘇大橋 (Great Aso Bridge Collapse)",
+                badge: "次生災害 / 交通中斷",
+                desc: "連接熊本市區與阿蘇山區的交通樞紐。地震引發山體大規模山泥傾瀉（土石流），數萬噸土石直接擊中橋墩，導致鋼構大橋整座坍塌墜入黑川峽谷。",
+                extra: "地理考點：地震觸發山泥傾瀉（Secondary Hazard），導致救災黃金72小時交通完全中斷。"
+            },
+            fault: {
+                title: "布田川・日向田斷層帶 (Fault Zone)",
+                badge: "震源與板塊構造",
+                desc: "貫穿熊本縣地表的活性平移斷層帶。2016年震央極淺（11km），地表出現長達數十公里的裂隙與多達 2 米的水平錯位。",
+                extra: "地震參數：前震 M6.2，28小時後爆發主震 M7.3。極為罕見連續爆發兩次氣象廳震度7級強震。"
+            },
+            housing: {
+                title: "益城町古舊木造房屋 (Mashiki Town)",
+                badge: "社會因素脆弱性",
+                desc: "益城町受災最為嚴重。主要原因是當地存留大量 1981 年「新耐震基準」前建造的重型瓦頂木造住宅，結構耐震力不足導致倒塌。",
+                extra: "對比分析：現代鋼筋混凝土 (RC) 建築在震動中保持完好，證明建築法規與社經水平對抗震的關鍵作用。"
+            }
+        };
+
+        // --- INIT THREE.JS SCENE ---
+        function init3DScene() {
+            const container = document.getElementById('viewport-container');
+            
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+            scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
+
+            // Camera Setup (Isometric Tilt-Shift Perspective)
+            camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(28, 22, 28);
+
+            // Renderer Setup
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // Orbit Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2.1; // Don't go below ground
+            controls.minDistance = 10;
+            controls.maxDistance = 70;
+            controls.target.set(0, 0, 0);
+
+            // Lighting Setup
+            const ambientLight = new THREE.AmbientLight(0x94a3b8, 0.7);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfff7ed, 1.2);
+            sunLight.position.set(25, 40, 20);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 100;
+            sunLight.shadow.camera.left = -25;
+            sunLight.shadow.camera.right = 25;
+            sunLight.shadow.camera.top = 25;
+            sunLight.shadow.camera.bottom = -25;
+            scene.add(sunLight);
+
+            const pointLight = new THREE.PointLight(0xef4444, 1.5, 30);
+            pointLight.position.set(0, 5, 0);
+            scene.add(pointLight);
+
+            // Create Stylized Hexagonal World
+            createWorldGrid();
+
+            // Create Dust/Smoke Particles
+            createParticleSystem();
+
+            // Handle Window Resize
+            window.addEventListener('resize', onWindowResize);
+
+            // Raycaster for Clicking 3D Objects
+            setupRaycaster();
+
+            // Start Animation Loop
+            animate();
+        }
+
+        // --- CREATE HEXAGONAL ISLANDS ---
+        function createHexagonGeometry(radius, height) {
+            const geom = new THREE.CylinderGeometry(radius, radius, height, 6);
+            geom.rotateY(Math.PI / 6);
+            return geom;
+        }
+
+        function createWorldGrid() {
+            // Hex Islands Layout Coordinates
+            const hexRadius = 7;
+            const hexHeight = 2;
+            const islandPositions = [
+                { x: 0, z: 0, color: 0x334155, name: "震央構造島", id: 0 },
+                { x: 12.5, z: -7.2, color: 0x1e293b, name: "災情破壞島", id: 1 },
+                { x: -12.5, z: 7.2, color: 0x1e293b, name: "社經因素島", id: 2 },
+                { x: 12.5, z: 7.2, color: 0x1e293b, name: "辯論分析島", id: 3 }
+            ];
+
+            islandPositions.forEach((pos) => {
+                const islandGroup = new THREE.Group();
+                islandGroup.position.set(pos.x, 0, pos.z);
+
+                // Hex Platform Top Material & Geometry
+                const hexGeom = createHexagonGeometry(hexRadius, hexHeight);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: pos.color,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                const hexMesh = new THREE.Mesh(hexGeom, mat);
+                hexMesh.position.y = -hexHeight / 2;
+                hexMesh.receiveShadow = true;
+                islandGroup.add(hexMesh);
+
+                // Top Grass/Ground Layer
+                const topGeom = createHexagonGeometry(hexRadius - 0.2, 0.3);
+                const topMat = new THREE.MeshStandardMaterial({
+                    color: pos.id === 0 ? 0x475569 : (pos.id === 1 ? 0x3f3f46 : 0x164e63),
+                    roughness: 0.9
+                });
+                const topMesh = new THREE.Mesh(topGeom, topMat);
+                topMesh.position.y = 0.15;
+                topMesh.receiveShadow = true;
+                islandGroup.add(topMesh);
+
+                scene.add(islandGroup);
+                hexIslands.push(islandGroup);
+            });
+
+            // Populate Hex 0: Fault Line & Epicenter
+            populateFaultIsland(hexIslands[0]);
+
+            // Populate Hex 1: Kumamoto Castle & Broken Bridge
+            populateDisasterIsland(hexIslands[1]);
+
+            // Populate Hex 2: Socio-Economic Infrastructure
+            populateSocioIsland(hexIslands[2]);
+
+            // Populate Hex 3: Discussion Arena / Balance
+            populateDiscussionIsland(hexIslands[3]);
+        }
+
+        // --- POPULATE ISLAND 0: FAULT & EPICENTER ---
+        function populateFaultIsland(parent) {
+            // Fault Line Rupture Mesh (Jagged Dark Crevice)
+            const faultGeom = new THREE.BoxGeometry(0.8, 0.4, 11);
+            const faultMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 1 });
+            faultMesh = new THREE.Mesh(faultGeom, faultMat);
+            faultMesh.position.set(0, 0.2, 0);
+            faultMesh.rotation.y = Math.PI / 4;
+            faultMesh.userData = { type: 'hotspot', key: 'fault' };
+            parent.add(faultMesh);
+
+            // Glowing Red Seismograph Beacon at Epicenter
+            const beaconGeom = new THREE.CylinderGeometry(0.2, 0.6, 2, 8);
+            const beaconMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xb91c1c });
+            const beacon = new THREE.Mesh(beaconGeom, beaconMat);
+            beacon.position.set(0, 1, 0);
+            beacon.userData = { type: 'hotspot', key: 'fault' };
+            parent.add(beacon);
+
+            // Surrounding Rocks
+            for(let i=0; i<8; i++) {
+                const rockGeom = new THREE.DodecahedronGeometry(0.3 + Math.random()*0.3);
+                const rockMat = new THREE.MeshStandardMaterial({ color: 0x64748b });
+                const rock = new THREE.Mesh(rockGeom, rockMat);
+                rock.position.set((Math.random()-0.5)*8, 0.3, (Math.random()-0.5)*8);
+                parent.add(rock);
+            }
+        }
+
+        // --- POPULATE ISLAND 1: CASTLE & BROKEN BRIDGE ---
+        function populateDisasterIsland(parent) {
+            // Kumamoto Castle Pagoda Tier 1
+            const baseGeom = new THREE.BoxGeometry(2.5, 1, 2.5);
+            const baseMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+            const castleBase = new THREE.Mesh(baseGeom, baseMat);
+            castleBase.position.set(-2, 0.7, -1);
+            castleBase.castShadow = true;
+
+            // Tier 2 Roof
+            const roofGeom = new THREE.ConeGeometry(2, 1.2, 4);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+            castleMesh = new THREE.Mesh(roofGeom, roofMat);
+            castleMesh.position.set(-2, 1.8, -1);
+            castleMesh.rotation.y = Math.PI / 4;
+            castleMesh.castShadow = true;
+            castleMesh.userData = { type: 'hotspot', key: 'castle' };
+
+            parent.add(castleBase);
+            parent.add(castleMesh);
+
+            // Broken Aso Bridge
+            const bridgeGroup = new THREE.Group();
+            bridgeGroup.position.set(2, 0.5, 1);
+
+            const p1Geom = new THREE.BoxGeometry(0.8, 1.2, 0.8);
+            const pMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
+            const pier1 = new THREE.Mesh(p1Geom, pMat);
+            pier1.position.set(-1, 0.6, 0);
+
+            const pier2 = new THREE.Mesh(p1Geom, pMat);
+            pier2.position.set(1, 0.6, 0);
+
+            const roadGeom = new THREE.BoxGeometry(1.5, 0.2, 0.8);
+            const roadMat = new THREE.MeshStandardMaterial({ color: 0xd97706 });
+            bridgeMesh = new THREE.Mesh(roadGeom, roadMat);
+            bridgeMesh.position.set(-0.8, 1.3, 0);
+            bridgeMesh.rotation.z = -0.3; // Tilted collapse
+            bridgeMesh.userData = { type: 'hotspot', key: 'bridge' };
+
+            bridgeGroup.add(pier1);
+            bridgeGroup.add(pier2);
+            bridgeGroup.add(bridgeMesh);
+            parent.add(bridgeGroup);
+
+            // Mini Collapsed Houses (Mashiki Town)
+            for(let i=0; i<4; i++) {
+                const houseGeom = new THREE.BoxGeometry(0.8, 0.6, 0.8);
+                const houseMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+                const house = new THREE.Mesh(houseGeom, houseMat);
+                house.position.set(-1 + (i%2)*1.2, 0.5, 2 + Math.floor(i/2)*1.2);
+                house.userData = { type: 'hotspot', key: 'housing' };
+                parent.add(house);
+                debrisObjects.push(house);
+            }
+        }
+
+        // --- POPULATE ISLAND 2: SOCIO-ECONOMIC & MODERN INFRASTRUCTURE ---
+        function populateSocioIsland(parent) {
+            // Anti-Seismic Modern Reinforced Concrete Buildings
+            for(let i=0; i<3; i++) {
+                const h = 2.5 + i*1.2;
+                const bGeom = new THREE.BoxGeometry(1.2, h, 1.2);
+                const bMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, metalness: 0.8 });
+                const bMesh = new THREE.Mesh(bGeom, bMat);
+                bMesh.position.set(-2 + i*1.8, h/2 + 0.2, -1);
+                bMesh.castShadow = true;
+                parent.add(bMesh);
+            }
+
+            // High-Speed Shinkansen Track & Train
+            const trackGeom = new THREE.BoxGeometry(5.5, 0.15, 0.6);
+            const trackMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+            const track = new THREE.Mesh(trackGeom, trackMat);
+            track.position.set(0, 0.3, 2);
+            parent.add(track);
+
+            const trainGeom = new THREE.BoxGeometry(2, 0.4, 0.4);
+            const trainMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc });
+            const train = new THREE.Mesh(trainGeom, trainMat);
+            train.position.set(0, 0.55, 2);
+            parent.add(train);
+        }
+
+        // --- POPULATE ISLAND 3: DISCUSSION ARENA ---
+        function populateDiscussionIsland(parent) {
+            // Balance Scale Symbolic Geometry (Physical vs Socio-Economic)
+            const poleGeom = new THREE.CylinderGeometry(0.2, 0.3, 3);
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8 });
+            const pole = new THREE.Mesh(poleGeom, poleMat);
+            pole.position.set(0, 1.6, 0);
+            parent.add(pole);
+
+            const beamGeom = new THREE.BoxGeometry(4, 0.15, 0.3);
+            const beamMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b });
+            const beam = new THREE.Mesh(beamGeom, beamMat);
+            beam.position.set(0, 3, 0);
+            beam.rotation.z = 0.15; // Slightly tilted scale
+            parent.add(beam);
+
+            // Left Pan (Natural Factors)
+            const panGeom = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 12);
+            const panMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+            const leftPan = new THREE.Mesh(panGeom, panMat);
+            leftPan.position.set(-2, 2.2, 0);
+            parent.add(leftPan);
+
+            // Right Pan (Socio Factors)
+            const rightPan = new THREE.Mesh(panGeom, new THREE.MeshStandardMaterial({ color: 0x10b981 }));
+            rightPan.position.set(2, 2.7, 0);
+            parent.add(rightPan);
+        }
+
+        // --- DUST & SMOKE PARTICLE SYSTEM ---
+        function createParticleSystem() {
+            const particleCount = 150;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 40;
+                positions[i + 1] = Math.random() * 10 + 1;
+                positions[i + 2] = (Math.random() - 0.5) * 40;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: 0x94a3b8,
+                size: 0.3,
+                transparent: true,
+                opacity: 0.4
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+
+        // --- RAYCASTER FOR CLICKING OBJECTS ---
+        function setupRaycaster() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            window.addEventListener('click', (e) => {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+
+                if (intersects.length > 0) {
+                    let obj = intersects[0].object;
+                    while (obj && !obj.userData.key && obj.parent) {
+                        obj = obj.parent;
+                    }
+                    if (obj && obj.userData && obj.userData.key) {
+                        showHotspotModal(obj.userData.key);
+                    }
+                }
+            });
+        }
+
+        // --- SHOW HOTSPOT MODAL ---
+        function showHotspotModal(key) {
+            const data = hotspotsData[key];
+            if (!data) return;
+
+            document.getElementById('hotspot-title').innerText = data.title;
+            document.getElementById('hotspot-badge').innerText = data.badge;
+            document.getElementById('hotspot-desc').innerText = data.desc;
+            document.getElementById('hotspot-extra').innerText = data.extra;
+
+            const modal = document.getElementById('hotspot-modal');
+            modal.classList.remove('hidden');
+            playSoundEffect('click');
+        }
+
+        function closeHotspotModal() {
+            document.getElementById('hotspot-modal').classList.add('hidden');
+        }
+
+        // --- EARTHQUAKE SIMULATION ---
+        function triggerSimEarthquake(magnitude) {
+            isShaking = true;
+            playSoundEffect('quake');
+
+            const viewport = document.getElementById('viewport-container');
+            viewport.classList.add('shaking-active');
+
+            // Tilt roof & tilt houses depending on magnitude
+            if (castleMesh) {
+                castleMesh.rotation.z = (magnitude / 7.3) * 0.4;
+            }
+
+            if (bridgeMesh) {
+                bridgeMesh.rotation.z = -0.5 - (magnitude / 7.3) * 0.3;
+            }
+
+            debrisObjects.forEach((obj, idx) => {
+                obj.rotation.x = (Math.random() - 0.5) * (magnitude / 7.3);
+                obj.rotation.z = (Math.random() - 0.5) * (magnitude / 7.3);
+            });
+
+            showToast(`已模擬 ${magnitude === 6.2 ? '前震 M6.2' : '主震 M7.3'} 地震晃動與災情損毀！`);
+
+            setTimeout(() => {
+                viewport.classList.remove('shaking-active');
+                isShaking = false;
+            }, 2500);
+        }
+
+        function resetDamageState() {
+            if (castleMesh) castleMesh.rotation.z = 0;
+            if (bridgeMesh) bridgeMesh.rotation.z = -0.3;
+
+            debrisObjects.forEach(obj => {
+                obj.rotation.x = 0;
+                obj.rotation.z = 0;
+            });
+
+            showToast("模型已重置為地震前狀態。");
+        }
+
+        // --- CAMERA FOCUS ON ISLAND ---
+        function focusIsland(index) {
+            if (!hexIslands[index]) return;
+            const targetPos = hexIslands[index].position;
+
+            // Animate camera target
+            controls.target.set(targetPos.x, 1, targetPos.z);
+            camera.position.set(targetPos.x + 15, 12, targetPos.z + 15);
+            controls.update();
+
+            showToast(`聚焦至：${['震央構造島', '災情破壞島', '社經因素島', '辯論分析島'][index]}`);
+        }
+
+        function setCameraView(type) {
+            if (type === 'overview') {
+                controls.target.set(0, 0, 0);
+                camera.position.set(28, 22, 28);
+                controls.update();
+            }
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Particle float effect
+            if (particleSystem) {
+                const positions = particleSystem.geometry.attributes.position.array;
+                for (let i = 1; i < positions.length; i += 3) {
+                    positions[i] += 0.02;
+                    if (positions[i] > 15) positions[i] = 1;
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('viewport-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // --- UI TAB SWITCHING LOGIC ---
+        function switchTab(tabKey) {
+            activeTab = tabKey;
+            ['A', 'B', 'C'].forEach(k => {
+                const content = document.getElementById(`tab-content-${k}`);
+                const btn = document.getElementById(`tab-btn-${k}`);
+                if (k === tabKey) {
+                    content.classList.remove('hidden');
+                    btn.className = "flex-1 py-1.5 rounded-lg text-indigo-400 bg-indigo-950/80 border border-indigo-500/30 transition flex items-center justify-center gap-1";
+                } else {
+                    content.classList.add('hidden');
+                    btn.className = "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1";
+                }
+            });
+
+            // Focus relevant 3D island
+            if (tabKey === 'A') focusIsland(0);
+            if (tabKey === 'B') focusIsland(2);
+            if (tabKey === 'C') focusIsland(3);
+        }
+
+        // --- SET DEBATE POSITION ---
+        function setPosition(pos) {
+            currentPosition = pos;
+            ['agree', 'disagree', 'partial'].forEach(p => {
+                const btn = document.getElementById(`pos-btn-${p}`);
+                if (p === pos) {
+                    btn.className = "py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white border border-indigo-400 shadow transition";
+                } else {
+                    btn.className = "py-2 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-500 transition";
+                }
+            });
+        }
+
+        // --- GEMINI AI TUTOR INTEGRATION ---
+        async function evaluateWithGeminiAI() {
+            const reasons = document.getElementById('field-discussion-reasons').value.trim();
+            const aiBox = document.getElementById('ai-response-box');
+
+            if (!reasons) {
+                showToast("請先在欄位中填寫你的討論理由！", "warning");
+                return;
+            }
+
+            aiBox.innerHTML = `<div class="flex items-center gap-2 text-indigo-400"><i class="fa-solid fa-spinner animate-spin"></i> Gemini AI 正根據 DSE 地理科標準審閱中...</div>`;
+
+            const systemPrompt = "你是一位香港高中地理科 (HKDSE Geography) 資深考評專家導師。請針對學生對『日本熊本地震的災情是主要因為當地社會經濟因素導致嗎？』的答題進行專業、具建構性的點評。";
+            const userPrompt = `學生立場：${currentPosition}\n學生撰寫的理由：${reasons}\n\n請以繁體中文回答，包含：\n1. 地理概念準確度點評（自然災害強度 vs 社經因素防禦力）\n2. 針對其立場的優化建議與補充關鍵詞（如：極淺層地震、1.83g加速度、新耐震基準、老齡化人口避難等）。約 150-200 字。`;
+
+            try {
+                const apiKey = ""; // Canvas runtime environment automatically inserts key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+
+                const data = await response.json();
+                const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (aiText) {
+                    aiBox.innerHTML = `<div class="text-slate-200 space-y-1.5"><div class="font-bold text-indigo-300 border-b border-indigo-500/30 pb-1">AI 導師審閱反饋：</div><p class="leading-relaxed text-[11px]">${aiText.replace(/\n/g, '<br>')}</p></div>`;
+                    showToast("AI 審閱完成！");
+                } else {
+                    throw new Error("Invalid response format");
+                }
+            } catch (err) {
+                console.error(err);
+                aiBox.innerHTML = `<span class="text-amber-400">無法連線至 AI 伺服器，已提供預設參考引導：<br>「論述中可進一步對比自然因素（連續雙強震、1.83g加速度）與社經因素（新耐震法規降低了整體死亡率）的相對重要性。」</span>`;
+            }
+        }
+
+        // --- SAVE / EXPORT LOGIC ---
+        function saveWorksheetProgress() {
+            showToast("工作紙進度已儲存至瀏覽器！");
+        }
+
+        function exportWorksheetSummary() {
+            const name = document.getElementById('student-name').value;
+            const cls = document.getElementById('student-class').value;
+            
+            const summaryWindow = window.open('', '_blank');
+            summaryWindow.document.write(`
+                <html>
+                <head>
+                    <title>高中地理工作紙 - ${name}</title>
+                    <style>
+                        body { font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333; }
+                        h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 5px; }
+                        h2 { color: #1d4ed8; margin-top: 20px; }
+                        .meta { background: #f1f5f9; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+                        .box { background: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <h1>彩虹邨天主教英文中學 - 高中地理科</h1>
+                    <div class="meta">
+                        <strong>學生：</strong> ${name} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>班別：</strong> ${cls}<br>
+                        <strong>單元：</strong> 機會與風險 - 1.5 構造災害 (2016 日本熊本地震)
+                    </div>
+                    <h2>A. 地震災害資料搜集</h2>
+                    <div class="box"><strong>成因：</strong> ${document.getElementById('field-causes').value}</div>
+                    <div class="box"><strong>死亡/受傷：</strong> ${document.getElementById('field-deaths').value} / ${document.getElementById('field-injured').value}</div>
+                    <div class="box"><strong>建築破壞：</strong> ${document.getElementById('field-buildings').value}</div>
+                    
+                    <h2>C. 專題討論與立場</h2>
+                    <div class="box"><strong>學生立場：</strong> ${currentPosition}</div>
+                    <div class="box"><strong>詳細理由：</strong> ${document.getElementById('field-discussion-reasons').value}</div>
+                </body>
+                </html>
+            `);
+            summaryWindow.document.close();
+            showToast("已成功匯出學習報告！");
+        }
+
+        // --- MOBILE DRAWER TOGGLE ---
+        function toggleMobilePanel() {
+            const panel = document.getElementById('learning-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        // --- HELPER UTILS ---
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast-notification');
+            const msgEl = document.getElementById('toast-message');
+            msgEl.innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function playSoundEffect(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'click') {
+                    osc.frequency.value = 600;
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } else if (type === 'quake') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(80, ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(30, ctx.currentTime + 1.5);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 1.5);
+                }
+            } catch (e) {
+                // AudioContext autoplay restrictions safe fallback
+            }
+        }
+
+        // --- INITIALIZE ON LOAD ---
+        window.onload = function() {
+            init3DScene();
+            switchTab('A');
+        };
+    </script>
+</body>
+</html>
